@@ -1,7 +1,7 @@
 var crypto = require('crypto');
 
-function Cryp(ciphers) {
-  this.ciphers = [].concat(ciphers);
+function Cryp(keys) {
+  this.keys = [].concat(keys);
 }
 
 Cryp.prototype = {
@@ -9,45 +9,62 @@ Cryp.prototype = {
     if (data.constructor != Buffer)
       data = new Buffer(String(data));
 
-    var cipher = this.ciphers[0];
-    var iv = crypto.randomBytes(cipher.ivSize / 8);
-    var cip = crypto.createCipheriv(cipher.algorithm, cipher.key, iv);
-    data = Buffer.concat([iv, cip.update(data), cip.final()]);
-    var checksum = crypto.createHmac('sha256', cipher.key).update(data).digest();
-    data = Buffer.concat([checksum, data]);
+    var key = this.keys[0];
+    var iv = crypto.randomBytes(12);
+    var cip = crypto.createCipheriv('aes-256-gcm', key, iv);
+    data = Buffer.concat([cip.update(data), cip.final(), cip.getAuthTag(), iv]);
     return encoding ? data.toString(encoding) : data;
   },
 
   decrypt: function(data, inputEncoding, outputEncoding) {
     if (data.constructor != Buffer)
       data = new Buffer(data, inputEncoding);
-    else
+    else if (!outputEncoding)
       outputEncoding = inputEncoding;
 
-    var checksum = data.slice(0, 32);
-    data = data.slice(32);
+    var iv = data.slice(-12);
+    var tag = data.slice(-28, -12);
+    data = data.slice(0, -28);
 
-    for (var i = 0; i < this.ciphers.length; i++) {
-      var cipher = this.ciphers[i];
-      if (!checksum.equals(crypto.createHmac('sha256', cipher.key).update(data).digest()))
-        continue;
-      var ivSize = cipher.ivSize / 8;
-      var iv = data.slice(0, ivSize);
-      data = data.slice(ivSize);
-      var decip = crypto.createDecipheriv(cipher.algorithm, cipher.key, iv);
-      data = Buffer.concat([decip.update(data), decip.final()]);
-      return outputEncoding ? data.toString(outputEncoding) : data;
+    try {
+      for (var i = 0; i < this.keys.length; i++) {
+        var key = this.keys[i];
+        var decip = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decip.setAuthTag(tag);
+        try { // tag is incorrect, use old key to retry
+          data = Buffer.concat([decip.update(data), decip.final()]);
+        } catch (e) {
+          continue;
+        }
+        return outputEncoding ? data.toString(outputEncoding) : data;
+      }
+    } catch (e) {
+      return null;
     }
 
     return null;
   },
 
-  sign: function(data, encoding) {
+  sign: function(data) {
     if (data.constructor != Buffer)
       data = new Buffer(String(data));
 
-    var cipher = this.ciphers[0];
-    var sign = crypto.createHmac('sha256', cipher.key).update(data).digest();
+    var sign = base64url.encode(this.getSign(data));
+    return data.toString() + sign;
+  },
+
+  unsign: function(data) {
+    var sign = base64url.decode(data.slice(-38));
+    data = data.slice(0, -38);
+    return this.verify(data, sign) ? data : null;
+  },
+
+  getSign: function(data, encoding) {
+    if (data.constructor != Buffer)
+      data = new Buffer(String(data));
+
+    var key = this.keys[0];
+    var sign = crypto.createHmac('sha224', key).update(data).digest();
     return encoding ? sign.toString(encoding) : sign;
   },
 
@@ -58,13 +75,23 @@ Cryp.prototype = {
     if (sign.constructor != Buffer)
       sign = new Buffer(sign, signEncoding);
 
-    for (var i = 0; i < this.ciphers.length; i++) {
-      var cipher = this.ciphers[i];
-      if (sign.equals(crypto.createHmac('sha256', cipher.key).update(data).digest()))
+    for (var i = 0; i < this.keys.length; i++) {
+      var key = this.keys[i];
+      if (sign.equals(crypto.createHmac('sha224', key).update(data).digest()))
         return true;
     }
 
     return false;
+  }
+};
+
+var base64url = {
+  encode: function(buf) {
+    return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  },
+
+  decode: function(str) {
+    return new Buffer(str.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
   }
 };
 

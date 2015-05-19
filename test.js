@@ -1,32 +1,53 @@
 var Cryp = require('./Cryp');
 var crypto = require('crypto');
+var assert = require('assert');
 
-var cryp = new Cryp([{
-  algorithm: 'aes-256-cfb',
-  ivSize: 128,
-  key: crypto.pbkdf2Sync('pASsWoRD', 'SaLt', 4096, 32)
-}, {
-  algorithm: 'aes-256-cfb',
-  ivSize: 128,
-  key: crypto.pbkdf2Sync('OlDpaSSwoRd', 'sAlt', 4096, 32)
-}]);
+describe('Cryp', function() {
+  var cryp = new Cryp([crypto.pbkdf2Sync('pASsWoRD', 'SaLt', 4096, 32)]);
 
-var cryp2 = new Cryp([{
-  algorithm: 'aes-256-cfb',
-  ivSize: 128,
-  key: crypto.pbkdf2Sync('newPasSword', 'sAlt', 4096, 32)
-}, {
-  algorithm: 'aes-256-cfb',
-  ivSize: 128,
-  key: crypto.pbkdf2Sync('pASsWoRD', 'SaLt', 4096, 32)
-}]);
+  it('should encrypt a value', function() {
+    var data = cryp.encrypt('hello', 'base64');
+    assert.equal(cryp.decrypt(data, 'base64', 'utf8'), 'hello');
+  });
 
-var data = 'hello';
-var sign = cryp.sign(data, 'base64');
-console.log(sign);
-console.log(cryp.verify(data, sign, 'base64'));
-console.log(cryp2.verify(data, sign, 'base64'));
+  it('should encrypt a value #2', function() {
+    var data = cryp.encrypt('hello');
+    assert.equal(cryp.decrypt(data, 'utf8'), 'hello');
+    assert.equal(cryp.decrypt(data).toString(), 'hello');
+  });
 
-var secret = cryp.encrypt(data, 'base64');
-console.log(secret);
-console.log(cryp2.decrypt(secret, 'base64', 'utf8'));
+  it('should return null', function() {
+    var data = cryp.encrypt('hello', 'base64');
+    data = 'a' + data;
+    assert.equal(cryp.decrypt(data, 'base64', 'utf8'), null);
+  });
+
+  it('should decrypt with rotate keys', function() {
+    var data = cryp.encrypt('hello', 'base64');
+    var cryp2 = new Cryp([
+      crypto.pbkdf2Sync('NEWpASsWoRD', 'SaLt', 4096, 32),
+      crypto.pbkdf2Sync('pASsWoRD', 'SaLt', 4096, 32)
+    ]);
+    assert.equal(cryp2.decrypt(data, 'base64', 'utf8'), 'hello');
+  });
+
+  it('should sign a value', function() {
+    var data = cryp.sign('hello');
+    assert.equal(cryp.unsign(data), 'hello');
+  });
+
+  it('should return null', function() {
+    var data = cryp.sign('hello');
+    data = 'a' + data;
+    assert.equal(cryp.unsign(data), null);
+  });
+
+  it('should unsign with rotate keys', function() {
+    var data = cryp.sign('hello');
+    var cryp2 = new Cryp([
+      crypto.pbkdf2Sync('NEWpASsWoRD', 'SaLt', 4096, 32),
+      crypto.pbkdf2Sync('pASsWoRD', 'SaLt', 4096, 32)
+    ]);
+    assert.equal(cryp2.unsign(data), 'hello');
+  });
+});

@@ -1,22 +1,23 @@
 {
   "name": "cryp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "encrypt and decrypt data, sign and verify data",
   "main": "Cryp.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha test.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fenivana/Cryp.git"
+    "url": "https://github.com/fenivana/cryp.git"
   },
   "keywords": [
-    "crypto"
+    "crypto",
+    "encrypt"
   ],
-  "author": "Jiang Fengming",
-  "license": "ISC",
+  "author": "Jiang Fengming <fenix@noindoin.com> (http://www.noindoin.com/)",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/fenivana/Cryp/issues"
+    "url": "https://github.com/fenivana/cryp/issues"
   },
-  "homepage": "https://github.com/fenivana/Cryp#readme"
+  "homepage": "https://github.com/fenivana/cryp#readme"
 }
